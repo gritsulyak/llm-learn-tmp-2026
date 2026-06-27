@@ -2,13 +2,12 @@
 
 cd github/gritsulyak/llm-learn-tmp-2026/lessons/03_l8_ya_cloud_ya_gpt
 
-### Инициализировать uv-проект (создаст pyproject.toml)
+### Инициализирован uv-проект (создаст pyproject.toml)
 uv init --no-workspace
 
 ### Добавить зависимости (uv заменяет pip install)
 uv add requests python-dotenv yandex-gpt jupyter
 
-##### to compare
 uv add click // - for spacy
 
 uv add spacy && uv run python -m spacy download ru_core_news_sm
