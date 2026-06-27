@@ -1,1 +1,6 @@
 .env
+# Игнорировать все папки с кэшем Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd

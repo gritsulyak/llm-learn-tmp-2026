@@ -9,7 +9,7 @@ IS_LOCAL = os.getenv("IS_LOCAL", "false").lower() in ("true", "1", "yes")
 # Конфигурация Yandex Cloud
 YC_API_KEY   = os.getenv("YC_API_KEY")
 YC_FOLDER_ID = os.getenv("YC_FOLDER_ID")
-YC_URL       = "https://yandex.net"
+YC_URL       = os.getenv("YC_URL")
 
 # Конфигурация Ollama
 OLLAMA_HOST  = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -24,7 +24,7 @@ USER_PROMPT_TEMPLATE = """Извлеки из текста договора об
 - parties: список сторон (name, inn, kpp)
 - dates: дата подписания и сроки действия
 - amounts: суммы с валютой
-- obligations: сроки обязательств (дни/месяцы/даты)
+- obligations: только сроки обязательств (дни/месяцы/даты) если есть
 
 Верни ТОЛЬКО валидный JSON без markdown и пояснений.
 Если поля нет — верни null.
@@ -73,7 +73,7 @@ def _call_api(text: str) -> str:
             ],
             "response_format": { "type": "json_object" }
         }
-        timeout = 60  # Локальные модели на CPU/GPU могут отвечать дольше
+        timeout = 300  # Локальные модели на CPU/GPU могут отвечать дольше
     else:
         # Конфигурация для Yandex Cloud
         url = YC_URL
