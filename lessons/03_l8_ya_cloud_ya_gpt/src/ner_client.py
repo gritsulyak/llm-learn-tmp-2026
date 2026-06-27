@@ -17,7 +17,7 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
 OLLAMA_URL   = f"{OLLAMA_HOST}/v1/chat/completions"
 
 SYSTEM_PROMPT = """Ты — точный AI-помощник юриста.
-Извлекай факты строго из текста, без домыслов.
+Извлекай факты только из текста, без домыслов.
 Если данных нет — верни null. Никогда не придумывай."""
 
 USER_PROMPT_TEMPLATE = """Извлеки из текста договора об оказании услуг:
@@ -85,7 +85,7 @@ def _call_api(text: str) -> str:
             "modelUri": f"gpt://{YC_FOLDER_ID}/yandexgpt-lite",
             "completionOptions": {
                 "stream": False,
-                "temperature": 0.1,
+                "temperature": 0.01,
                 "maxTokens": "1000"
             },
             "messages": [
