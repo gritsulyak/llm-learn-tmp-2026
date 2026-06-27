@@ -8,6 +8,7 @@ load_dotenv()
 YC_API_KEY = os.getenv("YC_API_KEY")
 YC_FOLDER_ID = os.getenv("YC_FOLDER_ID")
 
+# to debug yandex api
 prompt = {
     "modelUri": f"gpt://{YC_FOLDER_ID}/yandexgpt-lite",
     "completionOptions": {

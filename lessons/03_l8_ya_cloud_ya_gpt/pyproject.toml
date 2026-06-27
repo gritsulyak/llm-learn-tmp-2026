@@ -5,8 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "click>=8.4.2",
     "jupyter>=1.1.1",
+    "natasha>=1.6.0",
     "python-dotenv>=1.2.2",
     "requests>=2.34.2",
+    "spacy>=3.8.14",
     "yandex-gpt>=0.3.0",
 ]
