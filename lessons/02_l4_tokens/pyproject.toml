@@ -1,0 +1,12 @@
+[project]
+name = "02-l4-tokens"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "datasets>=5.0.0",
+    "jupytext>=1.19.4",
+    "tokenizers>=0.22.2",
+    "transformers>=5.13.0",
+]
