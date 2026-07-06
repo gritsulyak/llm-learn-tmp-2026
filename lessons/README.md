@@ -1,1 +1,1 @@
-# some LLM engineer lessons solutions
+# Some LLM engineering course lessons solutions
