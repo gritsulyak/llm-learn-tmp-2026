@@ -1,3 +1,3 @@
 # langchain RAG
 
-requirements.txt: 
+
