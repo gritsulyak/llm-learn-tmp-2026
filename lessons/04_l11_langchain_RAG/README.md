@@ -12,7 +12,7 @@ enterprise_rag_langchain/
 ├── requirements.txt           # зависимости (venv)
 ├── .env.example                # шаблон конфигурации (скопировать в .env)
 ├── docker-compose.yml          # Qdrant (векторная БД)
-├── docs/                       # техническая документация
+├── doc/                       # техническая документация
 │   ├── ARCHITECTURE.md
 │   ├── RUN_AND_TEST.md
 │   └── NOTEBOOK_CONVERSION.md
