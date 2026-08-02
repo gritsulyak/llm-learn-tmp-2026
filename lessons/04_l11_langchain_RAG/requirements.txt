@@ -1,0 +1,17 @@
+langchain==0.3.*
+langchain-community==0.3.*
+langchain-ollama==0.2.*
+langchain-huggingface==0.1.*
+langchain-qdrant==0.2.*
+qdrant-client==1.12.*
+sentence-transformers==3.3.*
+pypdf==5.1.*
+unstructured==0.16.*
+gradio==5.9.*
+python-dotenv==1.0.*
+tiktoken==0.8.*
+jupytext==1.16.*
+jupyter==1.1.*
+nbconvert==7.16.*
+tqdm==4.67.*
+pydantic==2.10.*

@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+.env
+docs/
+data/qdrant_storage/
+notebook/*.py
+!notebook/rag_lab.ipynb
+#tests/test_results.json
+history_*.json
+.ipynb_checkpoints/
