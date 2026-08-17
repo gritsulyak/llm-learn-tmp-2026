@@ -11,7 +11,8 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from langchain_community.document_loaders import PyPDFLoader, TextLoader, DirectoryLoader
+from langchain_community.document_loaders import DirectoryLoader
+from langchain_community.document_loaders import PyPDFium2Loader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
@@ -30,7 +31,7 @@ def load_documents(docs_dir: Path):
 
     print(f"Гружу из: {docs_dir}")
     pdf_loader = DirectoryLoader(
-    str(docs_dir), glob="**/*.pdf", loader_cls=PyPDFLoader,
+    str(docs_dir), glob="**/*.pdf", loader_cls=PyPDFium2Loader,
     show_progress=True,
     silent_errors=True,
     )
@@ -62,10 +63,10 @@ def split_documents(docs):
 
 
 def get_embeddings():
-    """Мультиязычная CPU-модель эмбеддингов (легкая, ~470MB, работает без GPU)."""
+    """Мультиязычная CPU-модель эмбеддингов."""
     return HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL,
-        model_kwargs={"device": "cpu"},
+        model_kwargs={"device": "cpu", "trust_remote_code": True},
         encode_kwargs={"normalize_embeddings": True},
     )
 
@@ -114,7 +115,7 @@ def run_ingest(docs_dir: Path, collection_name: str):
         collection_name=collection_name,
         embedding=embeddings,
     )
-    vectorstore.add_documents(chunks)
+    vectorstore.add_documents(chunks, batch_size=64)
     print(f"✅ {len(chunks)} чанков сохранено в Qdrant (коллекция '{collection_name}').")
 
 

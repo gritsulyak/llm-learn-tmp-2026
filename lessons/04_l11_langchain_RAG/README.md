@@ -64,7 +64,9 @@ pip install -r requirements.txt
 cp .env.example .env
 
 # 4. Скачать модель в Ollama (если ещё нет)
-ollama pull qwen3.5:4b
+ollama pull qwen2.5:1.5b
+ollama create qwen2.5-32k -f ./Modelfile
+ollama run qwen2.5-32k
 
 # 5. Поднять Qdrant
 docker compose up -d
@@ -72,7 +74,10 @@ docker compose up -d
 # 6. Положить PDF/TXT документы в папку docs/
 mkdir -p docs && cp /path/to/your/*.pdf docs/
 
-# 7. Прогнать индексацию документов
+# 7.1 Почистить quadrant  
+curl -X DELETE http://localhost:6333/collections/enterprise_docs
+
+# 7.2 Прогнать индексацию документов
 python -m src.ingest
 
 # 8. Запустить чат-интерфейс (Gradio)
