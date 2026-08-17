@@ -10,7 +10,7 @@ import dataclasses
 
 from llama_index.core.llms import ChatMessage, MessageRole
 
-from corporate_assistant.config import LLM_MODEL, OLLAMA_URL, TOP_K
+from corporate_assistant.config import TOP_K
 from corporate_assistant.indexing import load_index
 from corporate_assistant.llm import build_llm
 from corporate_assistant.prompts import (
@@ -36,7 +36,7 @@ class CorporateAssistant:
         self.collection_name = collection_name
         self.top_k = top_k
         self.index = load_index(collection_name=collection_name)
-        self.llm = build_llm(model=LLM_MODEL, base_url=OLLAMA_URL)
+        self.llm = build_llm()
 
     def retrieve(self, query: str) -> list:
         retriever = self.index.as_retriever(similarity_top_k=self.top_k)

@@ -15,9 +15,9 @@
 | Чанкинг        | Сплиттер по границам предложений; чанк привязан к одной странице      |
 | Эмбеддинги     | `intfloat/multilingual-e5-small` (384 d, CPU)                         |
 | Vector DB      | Qdrant `corporate_assistant_2026`                                     |
-| LLM            | `qwen2.5:3b` через Ollama                                             |
+| LLM            | `yandexgpt-lite` через Yandex Cloud (ретривер + генерация)         |
 | Фреймворк      | LlamaIndex                                                           |
-| Оценка RAGAS   | `ragas` + `langchain-ollama` (судья — локальный `qwen2.5:3b`)        |
+| Оценка RAGAS   | `ragas` + судья: Yandex Cloud (`yandexgpt-lite`) или Ollama (`qwen2.5:3b`) |
 
 ## Структура проекта
 
@@ -28,7 +28,7 @@ src/corporate_assistant/
   indexing.py      Эмбеддинги, сборка/чтение Qdrant-индекса, retriever
   prompts.py       Системный промпт, форматирование контекста, grounding
   assistant.py     RAG-пайплайн (retrieval → LLM → проверка ссылок)
-  llm.py           Обёртка над Ollama
+  llm.py           Обёртка над Yandex Cloud (CustomLLM)
 scripts/
   generate_knowledge_base.py  Генерация PDF и HTML wiki (reportlab)
   build_index.py              Парсинг + индексация в Qdrant
@@ -47,7 +47,8 @@ data/
 results/
   test_log.md      Лог 6 тестовых вопросов с вердиктами
   test_results.json Результаты в машиночитаемом виде
-  ragas_scores.json Оценка RAGAS по 5 вопросам (faithfulness, precision, recall)
+  ragas_scores_ollama.json  Оценка RAGAS — судья Ollama
+  ragas_scores_yandex.json  Оценка RAGAS — судья Yandex Cloud
 ```
 
 ## Быстрый старт
@@ -60,7 +61,8 @@ uv run python scripts/generate_knowledge_base.py   # опционально
 uv run python scripts/build_index.py --reset       # парсинг + индексация
 uv run python scripts/run_tests.py                 # 6 тестов с проверкой цитирования
 uv run pytest -q                                   # unit-тесты парсера и grounding
-uv run python scripts/evaluate_ragas.py            # RAGAS-оценка (~5 мин, локальный судья)
+uv run python scripts/evaluate_ragas.py --judge yandex  # RAGAS-оценка (Yandex судья)
+uv run python scripts/evaluate_ragas.py --judge ollama   # RAGAS-оценка (Ollama судья)
 ```
 
 ## Чат-режим
@@ -79,27 +81,45 @@ Wiki — `Название статьи — раздел «Заголовок р
 ## RAGAS-оценка
 
 Метрики `faithfulness`, `context_precision`, `context_recall` на 5 вопросах с
-эталонными ответами. Судья и эмбеддинги — локальные (Ollama `qwen2.5:3b`),
-поэтому результаты воспроизводимы без внешних API. Цитаты `[Файл.pdf, стр. N]`
-из ответов перед оценкой удаляются (ссылка — не факт из контекста, судья
-трактовал её как «неподтверждённое утверждение»).
+эталонными ответами. Судья — Yandex Cloud (`yandexgpt-lite`) или локальный
+Ollama (`qwen2.5:3b`). Эмбеддинги — локальные (Ollama).
+Цитаты `[Файл.pdf, стр. N]` из ответов перед оценкой удаляются (ссылка —
+не факт из контекста, судья трактует её как «неподтверждённое утверждение»).
 
 ```bash
-uv run python scripts/evaluate_ragas.py   # результат в results/ragas_scores.json
+uv run python scripts/evaluate_ragas.py --judge yandex                          # yandexgpt-lite
+uv run python scripts/evaluate_ragas.py --judge yandex --judge-model yandexgpt-5.1
+uv run python scripts/evaluate_ragas.py --judge ollama                           # qwen2.5:3b
 ```
 
-Средние по 5 вопросам (прогон от 2026-08-17):
+### Сравнение судей (прогон от 2026-08-17)
 
-| Метрика        | Значение |
-|----------------|----------|
-| `faithfulness` | 0.500    |
-| `context_precision` | 0.851 |
-| `context_recall`    | 1.000 |
+Один и тот же RAG-пайплайн (Yandex `yandexgpt-lite` как основная LLM),
+разные модели-судьи для оценки:
 
-- `context_recall` = 1.0 — ретривер находит всю информацию для ответа
-- `context_precision` ≈ 0.85 — большинство извлечённых чанков релевантны
-- `faithfulness` ≈ 0.5 — занижен слабостью локальной модели-судьи; для
-  продакшена оценку нужно проводить сильной моделью (GPT-класса)
+| Метрика            | Ollama (`qwen2.5:3b`) | Yandex (`yandexgpt-lite`) | Yandex (`yandexgpt-5.1`) |
+|--------------------|------------------------|----------------------------|---------------------------|
+| `faithfulness`     | 0.567                  | 0.900                      | **1.000**                 |
+| `context_precision`| 0.951                  | 0.846                      | 0.567                     |
+| `context_recall`   | 1.000                  | 1.000                      | 1.000                     |
+
+- `context_recall` = 1.0 для всех судей — ретривер находит всю информацию
+- `faithfulness`: `yandexgpt-5.1` ставит **1.0** (все ответы полностью
+  опираются на контекст), `yandexgpt-lite` — **0.90** (немного занижает),
+  `qwen2.5:3b` — **0.57** (существенно занижает, трактуя ссылки-цитаты
+  как галлюцинации)
+- `context_precision`: `qwen2.5:3b` — **0.95** (завышает, менее требователен),
+  `yandexgpt-lite` — **0.85** (умеренно строгий), `yandexgpt-5.1` — **0.57**
+  (очень строгий: считает, что значительная часть retrieved-чанков содержит
+  смежную, но не целевую информацию). Разница между `yandexgpt-lite` (0.85)
+  и `yandexgpt-5.1` (0.57) в ~28 п.п. указывает на то, что более сильная
+  модель-судья предъявляет повышенные требования к точности ретривера:
+  засчитываются только чанки, содержащие непосредственно нужный факт
+- **Вывод:** сила модели-судьи критически влияет на оценку. `qwen2.5:3b`
+  ненадёжна как судья (завышает precision, занижает faithfulness).
+  `yandexgpt-5.1` — самый строгий судья: подтверждает идеальную faithfulness,
+  но выявляет проблемы с precision ретривера. Для продакшена рекомендуется
+  оценка сильной моделью (YandexGPT-5.1 / GPT-класса)
 
 ## Отчёт
 

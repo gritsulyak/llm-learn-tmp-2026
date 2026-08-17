@@ -8,18 +8,20 @@ from llama_index.core import Settings, StorageContext, VectorStoreIndex
 from llama_index.core.node_parser import SimpleNodeParser
 from llama_index.core.schema import TextNode
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.llms.ollama import Ollama
+from corporate_assistant.llm import YandexGPT
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 
 from corporate_assistant.config import (
     COLLECTION_NAME,
     EMBEDDING_MODEL,
-    LLM_MODEL,
     LLM_TEMPERATURE,
-    OLLAMA_URL,
     QDRANT_URL,
     TOP_K,
+    YC_API_KEY,
+    YC_FOLDER_ID,
+    YC_MODEL,
+    YC_URL,
 )
 from corporate_assistant.parsing import Chunk
 
@@ -48,11 +50,12 @@ def make_embed_model():
 
 def configure_settings() -> None:
     Settings.embed_model = make_embed_model()
-    Settings.llm = Ollama(
-        model=LLM_MODEL,
-        base_url=OLLAMA_URL,
+    Settings.llm = YandexGPT(
+        api_key=YC_API_KEY,
+        folder_id=YC_FOLDER_ID,
+        model=YC_MODEL,
+        url=YC_URL,
         temperature=LLM_TEMPERATURE,
-        request_timeout=600.0,
     )
     # Чанки уже нарезаны в parsing.py: разбивать повторно не нужно.
     Settings.node_parser = SimpleNodeParser.from_defaults()
