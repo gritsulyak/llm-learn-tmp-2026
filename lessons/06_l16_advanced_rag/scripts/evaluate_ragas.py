@@ -177,7 +177,7 @@ def _build_judge_llm(judge: str, judge_model: str | None = None) -> LangchainLLM
     from langchain_ollama import ChatOllama
 
     return LangchainLLMWrapper(
-        ChatOllama(model=judge_model or OLLAMA_MODEL, base_url=OLLAMA_URL, temperature=0.0, request_timeout=900.0)
+        ChatOllama(model=judge_model or OLLAMA_MODEL, base_url=OLLAMA_URL, temperature=0.0, request_timeout=1800.0)
     )
 
 
@@ -231,7 +231,7 @@ def main() -> None:
     score = evaluate(
         dataset=dataset,
         metrics=metrics,
-        run_config=RunConfig(timeout=900, max_retries=3, max_wait=120),
+        run_config=RunConfig(timeout=1800, max_retries=3, max_wait=300),
     )
 
     print("\n=== RAGAS-результаты ===")
