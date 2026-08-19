@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+results/checkpoints/
+results/lora_adapter_local/
+notebooks/*_run.ipynb

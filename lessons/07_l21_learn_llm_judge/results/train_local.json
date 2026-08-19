@@ -1,0 +1,11 @@
+{
+  "elapsed_sec": 2211.3,
+  "global_step": 200,
+  "training_loss": 0.532231213003397,
+  "train_samples": 160,
+  "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "lora_r": 4,
+  "lora_alpha": 8,
+  "device": "cpu",
+  "adapter_dir": "/home/rtg/github/gritsulyak/llm-learn-tmp-2026/lessons/07_l21_learn_llm_judge/results/lora_adapter_local"
+}

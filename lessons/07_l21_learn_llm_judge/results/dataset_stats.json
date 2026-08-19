@@ -1,0 +1,21 @@
+{
+  "total": 201,
+  "entities": {
+    "DEALS": 45,
+    "EMPLOYEES": 56,
+    "INVENTORY": 44,
+    "PROJECTS": 56
+  },
+  "operators": {
+    "ABOVE": 81,
+    "BELOW": 26,
+    "IS": 201,
+    "NOT": 9
+  },
+  "output_formats": {
+    "JSON": 4,
+    "LIST": 2,
+    "TABLE": 5
+  },
+  "multi_condition": 111
+}
