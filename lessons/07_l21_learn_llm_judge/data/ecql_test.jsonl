@@ -1,0 +1,41 @@
+{"instruction": "Переведи запрос на ECQL", "input": "Назови все товары на складе, количество которых меньше 10", "output": "FETCH [INVENTORY] WHERE @quantity BELOW 10"}
+{"instruction": "Переведи запрос на ECQL", "input": "Какие товары находятся в категории 'Офисная техника' и стоят меньше 30 тысяч?", "output": "FETCH [INVENTORY] WHERE @category IS 'Office equipment' && @price BELOW 30000"}
+{"instruction": "Переведи запрос на ECQL", "input": "Какие клиенты заключили сделки на сумму выше 10 000 долларов?", "output": "FETCH [DEALS] WHERE @amount ABOVE 10000 && @currency IS 'USD'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найди всех сотрудников в Москве", "output": "FETCH [EMPLOYEES] WHERE @city IS 'Moscow'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Какие сотрудники работают в отделе маркетинга и имеют зарплату больше 200 000 RUB", "output": "FETCH [EMPLOYEES] WHERE @department IS 'Маркетинг' && @salary ABOVE 200000"}
+{"instruction": "Переведи запрос на ECQL", "input": "Какие товары находятся в статусе 'На складе' и имеют количество больше 50?", "output": "FETCH [INVENTORY] WHERE @status IS 'In stock' && @quantity ABOVE 50"}
+{"instruction": "Переведи запрос на ECQL", "input": "Какие проекты имеют бюджет ниже 50 000 евро и приоритет 'Medium'?", "output": "FETCH [PROJECTS] WHERE @budget BELOW 50000 && @priority IS 'Medium'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти все проекты с бюджетом выше 100 000", "output": "FETCH [PROJECTS] WHERE @budget ABOVE 100000"}
+{"instruction": "Переведи запрос на ECQL", "input": "Покажи все проекты с приоритетом 'High', бюджетом больше 300 тысяч долларов и командой больше 20 человек", "output": "FETCH [PROJECTS] WHERE @priority IS 'High' && @budget ABOVE 300000 && @team_size ABOVE 20"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти всех сотрудников, которые работают в Москве или Санкт-Петербурге", "output": "FETCH [EMPLOYEES] WHERE @city IS 'Moscow' || @city IS 'Saint Petersburg'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти все товары на складе с количеством меньше 10", "output": "FETCH [INVENTORY] WHERE @quantity BELOW 10"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найди все товары на складе в Москве", "output": "FETCH [INVENTORY] WHERE @location IS 'Moscow'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Покажи все товары на складе в категории 'Офисная техника', кроме принтеров", "output": "FETCH [INVENTORY] WHERE @category IS 'Office Equipment' && @name NOT 'Printer'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Покажи все проекты, у которых бюджет больше 1 000 000 и приоритет 'High'", "output": "FETCH [PROJECTS] WHERE @budget ABOVE 1000000 && @priority IS 'High'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти всех сотрудников, которые работают в отделе маркетинга и получают зарплату больше 150000 или работают в отделе продаж, в формате JSON", "output": "FETCH [EMPLOYEES] WHERE (@department IS 'Marketing' && @salary ABOVE 150000) || @department IS 'Sales' AS JSON"}
+{"instruction": "Переведи запрос на ECQL", "input": "Какие сделки были заключены в Москве или Санкт-Петербурге?", "output": "FETCH [DEALS] WHERE @client IS 'Moscow' || @client IS 'Saint Petersburg'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти все проекты с бюджетом больше 100 000", "output": "FETCH [PROJECTS] WHERE @budget ABOVE 100000"}
+{"instruction": "Переведи запрос на ECQL", "input": "Покажи все проекты, у которых приоритет 'High', бюджет больше 1 000 000 и срок выполнения меньше 6 месяцев", "output": "FETCH [PROJECTS] WHERE @priority IS 'High' && @budget ABOVE 1000000 && @deadline BELOW 6"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти все проекты с приоритетом 'high', которые ещё не завершены", "output": "FETCH [PROJECTS] WHERE @priority IS 'high' && @status NOT 'completed'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти товары с количеством ниже 10", "output": "FETCH [INVENTORY] WHERE @quantity BELOW 10"}
+{"instruction": "Переведи запрос на ECQL", "input": "Покажи все проекты, у которых статус не 'Completed'", "output": "FETCH [PROJECTS] WHERE @status NOT 'Completed'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Покажи проекты с бюджетом больше 100 тысяч долларов", "output": "FETCH [PROJECTS] WHERE @budget ABOVE 100000"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти все проекты, которые ещё не завершены", "output": "FETCH [PROJECTS] WHERE @status NOT 'Completed'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти все товары в категории 'electronics' и в статусе 'available'", "output": "FETCH [INVENTORY] WHERE @category IS 'electronics' && @status IS 'available'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти всех сотрудников в отделе продаж или маркетинга", "output": "FETCH [EMPLOYEES] WHERE @department IS 'Sales' || @department IS 'Marketing'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Кто из менеджеров заключил больше 10 сделок?", "output": "FETCH [DEALS] WHERE @manager IS 'Manager' && @amount ABOVE 10 AS JSON"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти все проекты с бюджетом больше 100 000 и приоритетом 'high'", "output": "FETCH [PROJECTS] WHERE @budget ABOVE 100000 && @priority IS 'high'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти всех менеджеров по продажам", "output": "FETCH [EMPLOYEES] WHERE @position IS 'Sales Manager'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти сотрудников в возрасте от 30 до 40 лет", "output": "FETCH [EMPLOYEES] WHERE @age ABOVE 30 && @age BELOW 40"}
+{"instruction": "Переведи запрос на ECQL", "input": "Выведи список всех сотрудников, которые работают в Москве, имеют должность менеджера и зарплату больше 200 000", "output": "FETCH [EMPLOYEES] WHERE @city IS 'Moscow' && @position IS 'Manager' && @salary ABOVE 200000"}
+{"instruction": "Переведи запрос на ECQL", "input": "Какие сотрудники работают в отделе продаж и имеют зарплату больше 200 тысяч?", "output": "FETCH [EMPLOYEES] WHERE @department IS 'Sales' && @salary ABOVE 200000"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти все проекты, которые имеют приоритет 'High' и бюджет больше 500 000", "output": "FETCH [PROJECTS] WHERE @priority IS 'High' && @budget ABOVE 500000"}
+{"instruction": "Переведи запрос на ECQL", "input": "Выведи список всех сотрудников, работающих в Москве", "output": "FETCH [EMPLOYEES] WHERE @city IS 'Moscow'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Сколько проектов имеют статус 'Active'?", "output": "FETCH [PROJECTS] WHERE @status IS 'Active' AS TABLE"}
+{"instruction": "Переведи запрос на ECQL", "input": "Покажи все сделки с клиентами из России в рублях", "output": "FETCH [DEALS] WHERE @currency IS 'RUB'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Выведи список сотрудников из отдела продаж, работающих в Москве", "output": "FETCH [EMPLOYEES] WHERE @department IS 'Sales' && @city IS 'Moscow'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Выведи список сотрудников из отдела маркетинга или отдела продаж, работающих в Москве", "output": "FETCH [EMPLOYEES] WHERE (@department IS 'Marketing' || @department IS 'Sales') && @city IS 'Moscow'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Покажи все проекты с бюджетом больше 1 000 000", "output": "FETCH [PROJECTS] WHERE @budget ABOVE 1000000"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти все сделки с клиентами из США", "output": "FETCH [DEALS] WHERE @client IS 'USA'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти всех сотрудников, которые работают в отделе продаж или маркетинга", "output": "FETCH [EMPLOYEES] WHERE @department IS 'Sales' || @department IS 'Marketing'"}
+{"instruction": "Переведи запрос на ECQL", "input": "Найти всех сотрудников, которые работают в отделе маркетинга и получают зарплату больше 150000, в формате JSON", "output": "FETCH [EMPLOYEES] WHERE @department IS 'Marketing' && @salary ABOVE 150000 AS JSON"}

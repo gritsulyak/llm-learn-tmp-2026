@@ -1,0 +1,62 @@
+# Общий конфиг для локального (CPU) и облачного (GPU/Colab) пайплайнов.
+# Локальный прогон читает его через src/ecql/config.py; ноутбук train_colab.py — напрямую.
+
+dataset:
+  target_size: 200          # цель по числу пар «русский запрос» -> ECQL
+  per_batch: 20             # пар за один вызов модели-учителя
+  train_ratio: 0.8
+  min_pairs: 150            # нижняя планка после валидации
+  seed: 42
+
+teacher:                    # YandexGPT Pro (модель-учитель и судья)
+  model: yandexgpt/5.1      # «YandexGPT 5.1 Pro» (полная модель), работает на llm.api.cloud.yandex.net
+  temperature: 0.7
+  max_tokens: 4000
+
+local_train:                # CPU-эксперимент: Qwen2.5-1.5B-Instruct, LoRA r=4
+  base_model: Qwen/Qwen2.5-1.5B-Instruct
+  device: cpu
+  dtype: float32
+  lora_r: 4
+  lora_alpha: 8             # классическое правило alpha = 2 * r; на CPU самый устойчивый вариант
+  lora_dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj]
+  max_seq_length: 256
+  num_train_epochs: 2
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 4
+  learning_rate: 2.0e-4
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.05
+  logging_steps: 1
+  save_strategy: epoch
+  optim: adamw_torch
+
+gpu_train:                  # Colab GPU: выбираем лучшую из {Phi-4, Mistral 3 7B, Qwen3-4B-Instruct}
+  base_model: Qwen/Qwen3-4B-Instruct   # см. обоснование в README
+  device: cuda
+  load_in_4bit: true
+  bnb_4bit_quant_type: nf4
+  bnb_4bit_compute_dtype: bfloat16
+  lora_r: 4
+  lora_alpha: 16
+  lora_dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  max_seq_length: 512
+  num_train_epochs: 3
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 4
+  learning_rate: 2.0e-4
+  lr_scheduler_type: cosine
+  warmup_ratio: 0.05
+  logging_steps: 1
+  optim: paged_adamw_8bit
+
+judge:
+  model: yandexgpt/5.1      # LLM-as-a-judge на YandexGPT 5.1 Pro
+  temperature: 0.0
+  max_tokens: 800
+
+eval:
+  max_new_tokens: 128
+  temperature: 0.0
