@@ -253,13 +253,12 @@ GPU-модель вдвое крупнее (4B против 1.5B). Финаль�
 ## Сдача
 
 - **Код/репозиторий** — этот каталог (README, `scripts/`, `src/ecql/`, `notebooks/`)
-- **Исполненный отчёт** — `notebooks/report_local_run.ipynb` (+ `notebooks/report_local.py`)
+- **Исполненный отчёт локальной загрузки** — `notebooks/report_local_run.ipynb` (+ `notebooks/report_local.py`)
 - **Файл метрик** — `results/eval_local.json`, `results/eval_table.md`,
   `results/loss_curve.png`, `results/loss_log.csv`, а также артефакты Colab-прогона
   в `results_collab/ecql_results/` (`train_colab.json`, `eval_colab.json`,
   `loss_curve.png`)
-- **Веса адаптера** — `results/lora_adapter_local/` (загрузите на HuggingFace Hub
-  или Google Drive перед сдачей; код загрузки — в `train_colab.py`)
+- **Веса colab адаптера** — `results_colab/lora_adapter_local/` (https://huggingface.co/4rtgcom/checkpoints)
 - **Colab GPU-ноутбук** — `notebooks/train_colab.py`
 
 ## Критерии
