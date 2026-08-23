@@ -36,6 +36,8 @@ notebooks/
 data/                     ecql_dataset.jsonl (201), ecql_train.jsonl (160), ecql_test.jsonl (41)
 results/                  loss_log.csv, loss_curve.png, eval_local.json, eval_table.md,
                           train_local.json, dataset_stats.json, lora_adapter_local/
+results_collab/           Артефакты Colab-прогона: ecql_results/ (train_colab.json,
+                          eval_colab.json, loss_log.csv, loss_curve.png), ecql_adapter/
 tests/test_ecql.py        Pytest: грамматика, сплит, учитель/судья
 ```
 
@@ -149,6 +151,50 @@ uv run ruff check src/ scripts/ tests/ notebooks/
 Остаточные ошибки — частотные (редкие поля/значения/NOT-конструкции), они уйдут
 при расширении датасета.
 
+## Результаты ноутбуков: локальный CPU vs Colab GPU
+
+Оба ноутбука отработаны на одном датасете (**160 train / 41 test**) и одной
+тестовой выборке; артефакты — в `results/` (ноутбук `report_local.py`) и
+`results_collab/ecql_results/` (ноутбук `train_colab.py`).
+
+### Производительность
+
+| Ноутбук | Железо / режим | Модель | LoRA | Время обучения | Инференс (среднее) |
+|---------|----------------|--------|------|----------------|--------------------|
+| `report_local.py` | CPU fp32 (Ryzen 7 7840HS, 16 потоков) | Qwen2.5-1.5B-Instruct | r=4, α=8, 5 эпох (200 шагов) | **2211 c (~37 мин)** | **11.3 c/пример** |
+| `train_colab.py` | Tesla T4, QLoRA 4-bit NF4 | Qwen3-4B | r=4, α=16, 3 эпохи (60 шагов) | **161 c (~2.7 мин)** | **3.1 c/пример** |
+
+Источники: `results/train_local.json`, `results_collab/ecql_results/train_colab.json`.
+На T4 обучение идёт **~14× быстрее**, инференс — **~3.7× быстрее**, причём
+GPU-модель вдвое крупнее (4B против 1.5B). Финальный loss: 3.19 → **0.155** (CPU,
+`results/loss_log.csv`) против среднего training loss **0.63** (GPU,
+`results_collab/ecql_results/loss_log.csv`). Loss-кривые: `results/loss_curve.png`
+и `results_collab/ecql_results/loss_curve.png`.
+
+### Точность (41 пример теста, судья — YandexGPT Pro)
+
+| Метрика | CPU: Qwen2.5-1.5B (`eval_local.json`) | GPU: Qwen3-4B QLoRA (`eval_colab.json`) |
+|---------|---------------------------------------|------------------------------------------|
+| Синтаксическая корректность (парсер ECQL) | 85.4% | **95.1%** |
+| Точное совпадение с эталоном | 63.4% | **75.6%** |
+| Совпадение сущности | 85.4% | **95.1%** |
+| Совпадение полей | 82.9% | **87.8%** |
+| Совпадение операторов | 80.5% | **90.2%** |
+| Совпадение логики (&& / \|\|) | 78.0% | **87.8%** |
+| Совпадение формата (AS ...) | 95.1% | 95.1% |
+| SQL-галлюцинации | **0%** | **0%** |
+| **LLM-as-a-judge**, средний балл 0–5 | 4.41 | **4.61** |
+| Судья: доля ответов ≥ 4 | 80.5% | **90.2%** |
+
+Источники: `results/eval_local.json`, `results_collab/ecql_results/eval_colab.json`.
+
+**Вывод:** более крупный чекпоинт + QLoRA на GPU улучшают все метрики точности
+(+9.8 п.п. синтаксис, +12.2 п.п. exact match, +0.2 балла судьи, pass rate
+80.5% → 90.2%) при обучении в ~14 раз быстрее. При этом локальный CPU-прогон —
+рабочий минимум: даже модель 1.5B выучивает DSL без единой SQL-галлюцинации,
+а остаточные ошибки у обеих моделей одинаковы по типу (перевод значений,
+редкие поля, NOT-конструкции).
+
 ## Google Colab GPU: выбор модели
 
 Из кандидатов **Phi-4 (14B)**, **Mistral 3 / Small 3 (24B)**, **Qwen3-4B-Instruct (4B)**
@@ -187,9 +233,10 @@ uv run ruff check src/ scripts/ tests/ notebooks/
    (3 эпохи, эффективный батч 8, lr=2e-4).
 
 5. **Замеры времени.** Ячейка 5 выведет длительность обучения, ячейка 7 —
-   время инференса на тестовой выборке. Сравните с CPU-версией
-   (`report_local.py`: ~37 мин на 5 эпох, ~7-11 c/пример на инференс).
-   На T4 ожидается ускорение в 5-10 раз.
+   время инференса на тестовой выборке. Фактический замер на T4: обучение
+   **161 c (~2.7 мин)** против 2211 c (~37 мин) на CPU — ускорение ~14×;
+   инференс 3.1 c/пример против 11.3 c (~3.7×). Детали — в разделе
+   «Результаты ноутбуков».
 
 6. **Сохраните адаптер.** Ячейка 6 пишет веса в `/content/ecql_adapter/`.
    Для сдачи загрузите их на HuggingFace Hub (раскомментируйте
@@ -208,7 +255,9 @@ uv run ruff check src/ scripts/ tests/ notebooks/
 - **Код/репозиторий** — этот каталог (README, `scripts/`, `src/ecql/`, `notebooks/`)
 - **Исполненный отчёт** — `notebooks/report_local_run.ipynb` (+ `notebooks/report_local.py`)
 - **Файл метрик** — `results/eval_local.json`, `results/eval_table.md`,
-  `results/loss_curve.png`, `results/loss_log.csv`
+  `results/loss_curve.png`, `results/loss_log.csv`, а также артефакты Colab-прогона
+  в `results_collab/ecql_results/` (`train_colab.json`, `eval_colab.json`,
+  `loss_curve.png`)
 - **Веса адаптера** — `results/lora_adapter_local/` (загрузите на HuggingFace Hub
   или Google Drive перед сдачей; код загрузки — в `train_colab.py`)
 - **Colab GPU-ноутбук** — `notebooks/train_colab.py`

@@ -6,4 +6,5 @@ __pycache__/
 .env
 results/checkpoints/
 results/lora_adapter_local/
+results_collab/ecql_adapter
 notebooks/*_run.ipynb

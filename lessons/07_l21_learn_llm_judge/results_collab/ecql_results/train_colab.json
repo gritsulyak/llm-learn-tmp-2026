@@ -1,0 +1,13 @@
+{
+  "elapsed_sec": 160.6,
+  "global_step": 60,
+  "training_loss": 0.6256281052172805,
+  "train_samples": 160,
+  "base_model": "Qwen/Qwen3-4B",
+  "lora_r": 4,
+  "lora_alpha": 16,
+  "device": "cuda",
+  "gpu": "Tesla T4",
+  "quantization": "4bit_nf4",
+  "adapter_dir": "/content/ecql_adapter"
+}
