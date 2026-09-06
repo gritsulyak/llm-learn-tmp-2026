@@ -1,0 +1,54 @@
+name: "ensemble"
+backend: "python"
+max_batch_size: 1
+
+input [
+  {
+    name: "TEXT"
+    data_type: TYPE_UINT8
+    dims: [ -1 ]
+  }
+]
+
+output [
+  {
+    name: "RESPONSE"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_CPU
+  }
+]
+
+parameters: {
+  key: "tokenizer_model"
+  value: {
+    string_value: "text_tokenizer"
+  }
+}
+
+parameters: {
+  key: "embedding_model"
+  value: {
+    string_value: "embedding"
+  }
+}
+
+parameters: {
+  key: "classification_model"
+  value: {
+    string_value: "classification"
+  }
+}
+
+parameters: {
+  key: "generation_model"
+  value: {
+    string_value: "generation"
+  }
+}

@@ -1,0 +1,44 @@
+name: "generation"
+backend: "python"
+max_batch_size: 8
+
+input [
+  {
+    name: "TEXT"
+    data_type: TYPE_UINT8
+    dims: [ -1 ]
+  }
+]
+
+output [
+  {
+    name: "GENERATED_TEXT"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+
+instance_group [
+  {
+    count: 2
+    kind: KIND_CPU
+  }
+]
+
+dynamic_batching {
+  max_queue_delay_microseconds: 100
+}
+
+parameters: {
+  key: "max_new_tokens"
+  value: {
+    string_value: "128"
+  }
+}
+
+parameters: {
+  key: "temperature"
+  value: {
+    string_value: "0.1"
+  }
+}
