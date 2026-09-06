@@ -1,0 +1,5 @@
+model_repository/**/*.gguf
+**/__pycache__*
+perf/results/
+reference/
+.git/

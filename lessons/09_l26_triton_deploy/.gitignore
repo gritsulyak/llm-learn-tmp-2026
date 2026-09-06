@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Large model artifacts (regenerable via export_models.py)
+model_repository/**/1/model.onnx
+model_repository/**/1/config.json
+model_repository/**/1/tokenizer.json
+model_repository/**/1/vocab.txt
+model_repository/**/1/special_tokens_map.json
+model_repository/**/1/tokenizer_config.json
+model_repository/**/1/merges.txt
+model_repository/**/1/*.model
+model_repository/**/*.gguf
+
+# Dataset files
+*.csv
+*.pth
+
+# Load test results
+perf/results/

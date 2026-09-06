@@ -1,0 +1,27 @@
+[project]
+name = "triton-deploy"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "optimum[onnxruntime]",
+    "transformers",
+    "onnxruntime",
+    "tritonclient[grpc]",
+    "numpy",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "e2e: end-to-end tests requiring a live Triton server",
+]
+
+[tool.uv]
+extra-index-url = ["https://download.pytorch.org/whl/cpu"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
