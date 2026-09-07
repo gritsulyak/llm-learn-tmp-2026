@@ -17,7 +17,7 @@
 | `text_tokenizer` | python | `huawei-noah/TinyBERT_General_4L_312D` tokenizer | — | Токенизация |
 | `classification` | onnxruntime | TinyBERT 4L-312D (ONNX) | 14.5M | Классификация вопрос/утверждение |
 | `embedding` | onnxruntime | `sentence-transformers/all-MiniLM-L6-v2` (ONNX) | 22.7M | Эмбеддинги 384-d |
-| `generation` | python (HTTP) | llama.cpp (`llama-server`) + Qwen2.5-0.5B-Instruct-Q4_K_M.gguf | 0.5B | Генерация ответа на **Vulkan iGPU** |
+| `generation` | python (HTTP) | llama.cpp (`llama-server`) + Qwen2.5-0.5B-Instruct-Q4_K_M.gguf | 0.5B | Генерация ответа (llama.cpp: **CPU** \| **Vulkan iGPU**) |
 | `ensemble` | python (BLS) | — | — | Оркестрация цепочки |
 
 ```
@@ -43,10 +43,11 @@ BLS-модель (`ensemble`) вызывает остальные модели �
   для pull образа (шаг 3 ниже)
 - Python 3.10+ и [uv](https://docs.astral.sh/uv/)
 - Рекомендуется от 8 ГБ RAM и 4+ ядер CPU
-- Работает без NVIDIA GPU. Генерация ускоряется на **AMD iGPU** через
-  **llama.cpp + Vulkan** (`/dev/dri`, Radeon 780M).
+- Работает без NVIDIA GPU. Генерация идёт через **llama.cpp**: достаточно
+  **CPU**-сборки (~99–105 ток/с на 0.5B Q4_K_M), а при наличии **AMD iGPU**
+  ускоряется через **Vulkan** (`/dev/dri`, Radeon 780M, ~123 ток/с).
 - Для генерации нужен запущенный на хосте **llama.cpp `llama-server`**
-  (Vulkan-сборка) — Triton-модель `generation` шлёт ему HTTP
+  (CPU- или Vulkan-сборка) — Triton-модель `generation` шлёт ему HTTP
   (`LLAMA_SERVER_URL`, по умолчанию `http://host.docker.internal:8080`).
   Без него генерация откатывается на CPU-`transformers`.
 
@@ -117,18 +118,23 @@ uv run python export_models.py
 
 ## Запуск
 
-### Запуск llama.cpp `llama-server` (Vulkan на AMD iGPU) — один раз
+### Запуск llama.cpp `llama-server` (CPU или Vulkan на AMD iGPU) — один раз
 
 Модель `generation` отвечает по HTTP из локального llama.cpp. Запустите его на
-хосте (бинарник должен быть **Vulkan**-сборкой):
+хосте:
 
 ```bash
-bash perf/start_llama_server.sh
+# вариант 1 — CPU-сборка (ggml-cpu, без Vulkan)
+LLAMA_BIN=/path/to/llama.cpp/build-cpu/bin/llama-server N_GPU_LAYERS=off \
+    bash perf/start_llama_server.sh
+# вариант 2 — Vulkan-сборка (Radeon 780M), веса целиком на iGPU
+bash perf/start_llama_server.sh          # по умолчанию -ngl 99
 # curl http://127.0.0.1:8080/health   → {"status":"ok"}
 ```
 
 По умолчанию: модель `model_repository/generation/1/model.gguf`, `-ngl 99`
-(весь слой-стек на iGPU), порт `8080`, `-np 4` параллельных слотов.
+(весь слой-стек на iGPU), порт `8080`, `-np 4` параллельных слотов, `-t 4`.
+Для **CPU**-бинарников передайте `LLAMA_BIN=...` и `N_GPU_LAYERS=off`.
 Переопределяется env: `PORT=8090 MODEL=/путь/к/model.gguf`.
 
 ### Запуск Triton (Docker)
@@ -161,7 +167,7 @@ docker compose down
    пустое тело, а не `1`).
 
 2. **Все 5 моделей в статусе READY** — дождаться статуса `READY`
-   (первый prompt-eval в llama.cpp прогревает шейдеры/GPU-состояние):
+   (первый prompt-eval в llama.cpp прогревает бэкенд — CPU/шейдеры):
    ```bash
    curl -vvv -X POST http://localhost:8000/v2/repository/index
    ```
@@ -273,7 +279,7 @@ Compute Infer из Prometheus-эндпоинта на порту 8002 — пом
 ├── train_classifier.py        # дообучение head TinyBERT + экспорт ONNX
 ├── model_repository/          # все модели: config.pbtxt + папки версий
 ├── perf/                      # инструменты нагрузочного тестирования
-├── perf/start_llama_server.sh # запуск llama.cpp llama-server (Vulkan iGPU)
+├── perf/start_llama_server.sh # запуск llama.cpp llama-server (CPU / Vulkan iGPU)
 ├── perf/results/              # (результаты прогонов, в gitignore)
 ├── pyproject.toml             # uv-проект / зависимости
 ├── reference/                 # референсное решение задания
@@ -291,7 +297,7 @@ Compute Infer из Prometheus-эндпоинта на порту 8002 — пом
   Perf Analyzer через `SDK_IMAGE`).
 - **Модель зависла в NOT READY** — смотрите `docker compose logs -f triton`;
   проверьте, что запущен `bash perf/start_llama_server.sh` (иначе генерация
-  откатится на медленный CPU-`transformers`, ~23 с за ответ).
+  откатится на CPU-`transformers` в несколько раз медленнее llama.cpp).
 - **Triton 24.01 + `numpy 2.x`** — Python backend отдаёт пустые выходные
   тензоры (0 raw-байт), пока в образе не зафиксирован `numpy==1.26.4`
   (в Dockerfile уже зафиксирован).

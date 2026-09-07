@@ -17,7 +17,7 @@
 | `text_tokenizer` | python | `huawei-noah/TinyBERT_General_4L_312D` tokenizer | — | Tokenization |
 | `classification` | onnxruntime | TinyBERT 4L-312D (ONNX) | 14.5M | Question/statement classification |
 | `embedding` | onnxruntime | `sentence-transformers/all-MiniLM-L6-v2` (ONNX) | 22.7M | 384-d embeddings |
-| `generation` | python (HTTP) | llama.cpp (`llama-server`) + Qwen2.5-0.5B-Instruct-Q4_K_M.gguf | 0.5B | Answer generation on **Vulkan iGPU** |
+| `generation` | python (HTTP) | llama.cpp (`llama-server`) + Qwen2.5-0.5B-Instruct-Q4_K_M.gguf | 0.5B | Answer generation (llama.cpp: **CPU** \| **Vulkan iGPU**) |
 | `ensemble` | python (BLS) | — | — | Orchestrates the chain |
 
 ```
@@ -42,10 +42,12 @@ and receives the final pipeline result.
 - Access to `nvcr.io/nvidia/tritonserver` — **free NGC login required** for the pull (step 3 below)
 - Python 3.10+ with [uv](https://docs.astral.sh/uv/)
 - Roughly 8 GB RAM and 4+ CPU cores recommended
-- Works **CPU-only except generation**: it accelerates on the AMD iGPU via
-  **llama.cpp + Vulkan** (`/dev/dri`, Radeon 780M). No NVIDIA GPU required.
+- Works **CPU-only except generation**: generation runs through **llama.cpp** —
+  a plain **CPU** build already gives ~99–105 tok/s on a 0.5B Q4_K_M model, and
+  with an **AMD iGPU** it accelerates via **llama.cpp + Vulkan** (`/dev/dri`,
+  Radeon 780M, ~123 tok/s). No NVIDIA GPU required.
 - For generation you need a running **llama.cpp `llama-server`** on the host
-  (Vulkan build) — the Triton `generation` model calls it over HTTP
+  (CPU or Vulkan build) — the Triton `generation` model calls it over HTTP
   (`LLAMA_SERVER_URL`, default `http://host.docker.internal:8080`).
   Without it, generation falls back to CPU `transformers`.
 
@@ -117,18 +119,23 @@ enough:
 
 ## Run
 
-### Start llama.cpp `llama-server` (Vulkan on the AMD iGPU) — one-time
+### Start llama.cpp `llama-server` (CPU or Vulkan on the AMD iGPU) — one-time
 
 The `generation` model answers over HTTP from a local llama.cpp server. Start
-it on the host (binary must be a **Vulkan** build):
+it on the host:
 
 ```bash
-bash perf/start_llama_server.sh
+# option 1 — CPU build (ggml-cpu, no Vulkan)
+LLAMA_BIN=/path/to/llama.cpp/build-cpu/bin/llama-server N_GPU_LAYERS=off \
+    bash perf/start_llama_server.sh
+# option 2 — Vulkan build (Radeon 780M), all layers on the iGPU
+bash perf/start_llama_server.sh          # defaults to -ngl 99
 # curl http://127.0.0.1:8080/health   → {"status":"ok"}
 ```
 
 Defaults: model `model_repository/generation/1/model.gguf`, `-ngl 99`
-(offload all layers to the iGPU), port `8080`, `-np 4` parallel slots.
+(offload all layers to the iGPU), port `8080`, `-np 4` parallel slots, `-t 4`.
+For **CPU** binaries pass `LLAMA_BIN=...` and `N_GPU_LAYERS=off`.
 Override via env, e.g. `PORT=8090 MODEL=/path/to/model.gguf`.
 
 ### Start Triton (Docker)
@@ -159,8 +166,7 @@ docker compose down
    ```
    Both are HTTP 200 when ready (Triton 24.01 returns an empty body, not `1`).
 
-2. **All 5 models READY** — wait for `"READY"` state (first prompt evaluation in
-   llama.cpp warms up shader/GPU state; can take a few seconds):
+2. **All 5 models READY** — wait for `"READY"` state (first prompt evaluation in llama.cpp warms up the backend — CPU/shaders; can take a few seconds):
    ```bash
    curl -s -X POST http://localhost:8000/v2/repository/index
    ```
@@ -271,7 +277,7 @@ tables (fill with your measurements), bottleneck analysis, and conclusions
 ├── train_classifier.py        # fine-tune TinyBERT head + export ONNX
 ├── model_repository/          # all models with config.pbtxt + version dirs
 ├── perf/                      # load testing tools
-├── perf/start_llama_server.sh # llama.cpp llama-server (Vulkan iGPU) launcher
+├── perf/start_llama_server.sh # llama.cpp llama-server (CPU / Vulkan iGPU) launcher
 ├── perf/results/              # (generated load-test results, gitignored)
 ├── pyproject.toml             # uv project / deps
 ├── reference/                 # reference solution from the task
@@ -289,7 +295,7 @@ tables (fill with your measurements), bottleneck analysis, and conclusions
   SDK image via `SDK_IMAGE`).
 - **Model stuck NOT READY** — watch `docker compose logs -f triton`; check that
   `bash perf/start_llama_server.sh` is running (else generation falls back to
-  slow CPU `transformers`, ~23 s per answer).
+  slow CPU `transformers` fallback, much slower than llama.cpp).
 - **Triton 24.01 + `numpy 2.x`** — the Python backend returns empty output
   tensors (0 raw bytes) unless `numpy==1.26.4` is pinned in the image;
   the Dockerfile already does this.

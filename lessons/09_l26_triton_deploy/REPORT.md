@@ -10,13 +10,15 @@ Business Logic Scripting (BLS) моделью на Python backend:
 | `text_tokenizer` | python | TinyBERT tokenizer | — | Токенизация текста |
 | `classification` | onnxruntime | TinyBERT 4L-312D | 14.5M | Двоичная классификация (вопрос/утверждение) |
 | `embedding` | onnxruntime | all-MiniLM-L6-v2 | 22.7M | Эмбеддинги 384-d (mean-pooling + L2-norm) |
-| `generation` | python (HTTP) | **llama.cpp (llama-server)**, Qwen2.5-0.5B-Instruct Q4_K_M | 0.5B | Генерация ответа на вопрос на **Vulkan iGPU** |
+| `generation` | python (HTTP) | **llama.cpp (llama-server)**, Qwen2.5-0.5B-Instruct Q4_K_M | 0.5B | Генерация ответа на вопрос (llama.cpp: **CPU** \| **Vulkan iGPU**) |
 | `ensemble` | python (BLS) | — | — | Дирижёр: токенизация → эмбеддинг + классификация → генерация |
 
 `generation` уже **не крутит HF-трансформер на CPU**: через Python-backend он
-делает HTTP-вызов к локальному `llama-server` (llama.cpp, **Vulkan**-бэкенд на
-Radeon 780M /dev/dri), который грузит GGUF-модель (`n_gpu_layers=-1`).
-Если llama-server недоступен — баттерфляй-фолбэк на `transformers` (CPU).
+делает HTTP-вызов к локальному `llama-server` (llama.cpp), который грузит
+GGUF-модель. Бэкенд llama.cpp переключаемый: **Vulkan iGPU** (Radeon 780M,
+`-ngl 99`) или чисто **CPU**-сборка (ggml-cpu, без Vulkan) — прогоны обоих
+вариантов в разделе 4. Если llama-server недоступен — фолбэк на
+`transformers` (CPU).
 
 Все модели работают на CPU (совместимо с AMD 7840HS iGPU). Для GPU достаточно
 сменить `KIND_CPU` на `KIND_GPU` в `config.pbtxt`.
@@ -82,9 +84,10 @@ BLS-модель вызывает остальные через `pb_utils.Infere
 Один инструмент:
 
 - **`perf/load_test.py`** (tritonclient, потоки) — тестирует все модели с
-  текстовым входом:
+  текстовым входом (для CPU- и Vulkan-прогонов llama.cpp соответственно):
   ```
-  uv run python perf/load_test.py --all --concurrency 2 --duration 30 --out perf/results/results_gpu.json
+  uv run python perf/load_test.py --all --concurrency 2 --duration 30 --out perf/results/results_cpu.json
+  uv run python perf/load_test.py --all --concurrency 2 --duration 30 --out perf/results/results_vulkan.json
   ```
 
 Два сценария из задания:
@@ -96,11 +99,12 @@ BLS-модель вызывает остальные через `pb_utils.Infere
 - **Latency**: Queue и Compute Infer — средние на запрос из Prometheus
   на порту 8002 (`nv_inference_*_duration_us / request_success`).
 
-### Как ускорили `generation` (сравнение подходов)
+### Как настраивали `generation` (сравнение бэкендов)
 
-См. раздел 4.2/4.3: HF `transformers` на CPU → llama.cpp (llama-server) на
-**Vulkan iGPU** (плюс `instance_group count: 2` и
-`dynamic_batching { max_queue_delay_microseconds: 100 }` для `generation`).
+См. раздел 4.2/4.3: llama.cpp (llama-server) — переключаемый бэкенд
+**CPU** (ggml-cpu, без Vulkan) ↔ **Vulkan iGPU** (плюс
+`instance_group count: 2` и `dynamic_batching { max_queue_delay_microseconds: 100 }`
+для `generation`).
 
 ## 4. Результаты
 
@@ -111,58 +115,110 @@ BLS-модель вызывает остальные через `pb_utils.Infere
 
 ### 4.2 Через perf/load_test.py (concurrency=2, duration=30)
 
+Оба прогона сделаны на **одном и том же состоянии** модели (GGUF
+Qwen2.5-0.5B Q4_K_M) и кода BLS, с интервалом в один запуск; различается
+только бэкенд `llama-server` — CPU-сборка (ggml-cpu, без Vulkan) или
+Vulkan iGPU (`-ngl 99`).
+
+Прогон 1 — llama.cpp **CPU** (без Vulkan) — `perf/results/results_cpu.json`:
+
 | Модель | reqs | rps | mean ms | p50 ms | p95 ms |
 |--------|------|-----|---------|--------|--------|
-| `text_tokenizer` | 111508 | 3711.25 | 0.52 | 0.50 | 0.71 |
-| `classification` | 3489 | 116.25 | 16.80 | 8.21 | 61.74 |
-| `embedding` | 1736 | 57.72 | 34.19 | 17.85 | 71.95 |
-| `generation` | 30 | 0.99 | 2011.57 | 2161.50 | 2301.17 |
-| `ensemble` (BLS) | 471 | 15.63 | 127.67 | 107.92 | 188.50 |
+| `text_tokenizer` | 124662 | 4149.01 | 0.47 | 0.45 | 0.59 |
+| `classification` | 3341 | 111.15 | 17.58 | 8.77 | 62.67 |
+| `embedding` | 1343 | 44.61 | 44.19 | 24.82 | 77.54 |
+| `generation` | 22 | 0.72 | 2765.56 | 2703.09 | 3685.14 |
+| `ensemble` (BLS) | 23 | 0.72 | 2706.10 | 2761.87 | 2814.34 |
 
-### 4.3 Сравнение `generation`: CPU (HF) ↔ GPU (llama.cpp Vulkan)
+Прогон 2 — llama.cpp **Vulkan iGPU** (Radeon 780M, `-ngl 99`) —
+`perf/results/results_vulkan.json`:
 
-Тот же конфиг load-тестера (concurrency=2, duration=30).
+| Модель | reqs | rps | mean ms | p50 ms | p95 ms |
+|--------|------|-----|---------|--------|--------|
+| `text_tokenizer` | 125692 | 4183.51 | 0.46 | 0.45 | 0.58 |
+| `classification` | 3362 | 111.92 | 17.45 | 8.47 | 62.55 |
+| `embedding` | 1599 | 53.17 | 37.00 | 20.02 | 76.03 |
+| `generation` | 36 | 1.13 | 1776.28 | 1948.93 | 2789.89 |
+| `ensemble` (BLS) | 31 | 0.98 | 2013.81 | 2014.47 | 2060.69 |
 
-| Метрика (generation) | Было: HF CPU | Стало: llama.cpp Vulkan | Δ |
-|----------------------|-------------|--------------------------|---|
-| reqs (за 30 с) | 4 | 30 | ×7.5 |
-| p50 latency | 23322.60 ms | 2161.50 ms | **×10.8** |
-| p95 latency | 23638.17 ms | 2301.17 ms | ×10.3 |
-| avg queue (Triton) | 6238.18 ms | 0.31 ms | **×20 000** |
-| avg compute-infer (Triton) | 11659.13 ms | 1856.66 ms | ×6.3 |
+> В обоих прогонах классификатор относит тестовый текст к классу «вопрос»,
+> поэтому `ensemble` идёт через шаг `generation` (счётчик Triton
+> `generation` = прямой вызов + вызовы из BLS: 22+23 CPU / 36+31 Vulkan).
+> Условия прогонов идентичны — сравнение корректно.
 
-> Почему так: HF `generate` на CPU (SmolLM-135M fp32) выдавал ~5–10 ток/с,
-> llama.cpp на Radeon 780M (Qwen2.5-0.5B Q4_K_M, Vulkan, `-ngl 99`) — **~120–130 ток/с**
-> (замер `llama-server` timings + `gpu_busy_percent`). Очередь почти исчезла:
-> 2 инстанса + `dynamic_batching` + быстрые GPU-слоты.
+### 4.3 Сравнение `generation`: llama.cpp CPU ↔ llama.cpp Vulkan
 
-### 4.4 Средняя задержка на этап (Triton metrics, порт 8002) — после оптимизации
+Тот же конфиг load-тестера (concurrency=2, duration=30), то же состояние
+модели и кода; различается только бэкенд llama.cpp: **ggml-cpu без Vulkan**
+(`-t 4`, 4 потока) против **Vulkan iGPU Radeon 780M** (`-ngl 99`).
+
+| Метрика (generation) | llama.cpp CPU | llama.cpp Vulkan | Δ CPU→Vulkan |
+|----------------------|---------------|------------------|--------------|
+| reqs (за 30 с) | 22 | 36 | ×1.64 |
+| rps | 0.72 | 1.13 | ×1.57 |
+| p50 latency | 2703.09 ms | 1948.93 ms | **×1.39** |
+| p95 latency | 3685.14 ms | 2789.89 ms | ×1.32 |
+| avg queue (Triton) | 0.26 ms | 0.26 ms | — |
+| avg compute-infer (Triton) | 2047.88 ms | 1416.14 ms | ×1.45 |
+
+Прямой замер токенов/с тем же GGUF (llama-bench, build `0b1bad14f`/10380,
+Qwen2.5-0.5B Q4_K_M, 494M) на той же машине:
+
+| Backend | pp512, ток/с | tg128, ток/с |
+|---------|-------------|--------------|
+| CPU (`-t 4`, как в start_llama_server.sh) | 543.96 ± 4.30 | 99.13 ± 0.23 |
+| CPU (`-t 8`) | 886.71 ± 39.74 | 105.52 ± 0.22 |
+| Vulkan iGPU Radeon 780M (`-ngl 99`) | 4604.77 ± 76.01 | 123.28 ± 5.26 |
+
+> Vulkan-бэкенд даёт **~25% к генерации** (123 vs 99 ток/с на 4 потоках —
+> авторегрессия упирается в память/мелкий decode), зато **prefill
+> ускоряется в ~8.5 раз** (4605 vs 544 ток/с), что важно при длинных
+> промптах. Поэтому p50 `generation` через Triton падает с ≈2.70 с (CPU) до
+> ≈1.95 с (Vulkan), а rps растёт 0.72→1.13. Очередь минимальна в обоих
+> вариантах: 2 инстанса + `dynamic_batching` + быстрые слоты.
+
+### 4.4 Средняя задержка на этап (Triton metrics, порт 8002)
+
+Прогон 1 — llama.cpp **CPU** (без Vulkan):
 
 | Модель | avg queue ms | avg compute-infer ms |
 |--------|--------------|----------------------|
-| `text_tokenizer` | 0.08 | 0.23 |
-| `classification` | 6.40 | 9.62 |
-| `embedding` | 12.29 | 20.53 |
-| `generation` | 0.31 | 1856.66 |
-| `ensemble` | 59.80 | 69.19 |
+| `text_tokenizer` | 0.08 | 0.20 |
+| `classification` | 7.81 | 8.76 |
+| `embedding` | 20.07 | 21.67 |
+| `generation` | 0.26 | 2047.88 |
+| `ensemble` | 1322.41 | 1382.84 |
+
+Прогон 2 — llama.cpp **Vulkan iGPU**:
+
+| Модель | avg queue ms | avg compute-infer ms |
+|--------|--------------|----------------------|
+| `text_tokenizer` | 0.08 | 0.20 |
+| `classification` | 7.61 | 8.71 |
+| `embedding` | 16.42 | 18.32 |
+| `generation` | 0.26 | 1416.14 |
+| `ensemble` | 989.09 | 1023.36 |
+
+> В обоих прогонах `ensemble` ждал вложенный `generation` (класс «вопрос»):
+> очередь ~990–1320 мс — это ожидание 2 инстансов generation, а не CPU-голод
+> BLS. Compute-время `generation` = generate 128 токенов + HTTP-хоп.
 
 ## 5. Анализ узких мест
 
 - **Queue vs Compute**: для ONNX-моделей очередь соизмерима с вычислениями
-  (`classification` 6.4 vs 9.6 мс, `embedding` 12.3 vs 20.5 мс) — при потоке
-  входных запросов Triton упирается в CPU-расчёты, а не планировщик.
-- **Очередь для `generation` устранена**: было 6238 мс (один CPU-инстанс
-  занят авторегрессией → остальное встаёт в очередь), стало **0.31 мс**
-  благодаря 2 инстансам, `dynamic_batching { max_queue_delay_microseconds: 100 }`
-  и переносу генерации на GPU (каждый запрос теперь ~2 с вместо ~23 с).
-- **Compute у `generation` (1857 мс)** = сам llama.cpp generate 128 токенов на iGPU
-  (~120 ток/с) + HTTP-хоп. Дальнейший выигрыш — короткие ответы
-  (`n_predict` меньше), лучшие модели (см. раздел 6).
-- **`ensemble` суммирует шаги**: p50 ≈ 108 мс без генерации
-  (токенизация <1 мс + классификация ~15 мс + эмбеддинг ~35 мс + BLS-overhead).
-  Очередь ensemble 59.8 мс — это ожидание вложенных моделей, не CPU-голод.
-- **RPS**: CPU-упирание у `classification` (116) и `embedding` (58);
-  `text_tokenizer` — лёгкий (3711).
+  (`classification` ~7.6–7.8 vs ~8.7–8.8 мс, `embedding` 16.4–20.1 vs 18.3–21.7 мс)
+  — при потоке входных запросов Triton упирается в CPU-расчёты, а не планировщик.
+- **Очередь для `generation` минимальна в обоих бэкендах (~0.26 мс)**:
+  2 инстанса + `dynamic_batching { max_queue_delay_microseconds: 100 }` и быстрые
+  слоты llama.cpp — авторегрессия одного запроса не блокирует остальные.
+- **Compute у `generation` (1416 мс на Vulkan / 2048 мс на CPU)** = генерация
+  128 токенов (123 ток/с на iGPU vs ~99 ток/с на CPU) + HTTP-хоп. Дальнейший
+  выигрыш — короткие ответы (`n_predict` меньше), лучшие модели (см. раздел 6).
+- **`ensemble` упирается в `generation`**: в обоих прогонах тестовый текст —
+  класс «вопрос», поэтому очередь `ensemble` (989–1322 мс) — это ожидание
+  вложенного `generation` (2 инстанса), а не узкое место BLS/CPU-голод.
+- **RPS**: `generation` — 0.72 (CPU) → 1.13 (Vulkan), `classification` — ~112,
+  `embedding` — 45–53; `text_tokenizer` — лёгкий (~4.2k).
 
 ## 6. Выводы
 
@@ -187,7 +243,7 @@ BLS-модель вызывает остальные через `pb_utils.Infere
 
 | Движок | Статус на 780M | Комментарий |
 |--------|----------------|-------------|
-| **llama.cpp (Vulkan/RADV)** | ✅ работает (этот отчёт) | ~120–130 ток/с на Q4_K_M 0.5B |
+| **llama.cpp (CPU / Vulkan)** | ✅ работает (этот отчёт) | ~99–105 ток/с (CPU) / ~120–130 ток/с (Vulkan) на Q4_K_M 0.5B |
 | ONNX Runtime (Vulkan EP) | ⚠️ возможен | подходит для tokenizer-моделей; LLM слабее оптимизирован |
 | vLLM / FlashAttention | ❌ | требует CUDA/ROCm-плюс; на APU нет |
 | MIGraphX / ROCm | ❌/⚠️ | gfx1103 не входит в список поддержки ROCm |
@@ -200,16 +256,16 @@ BLS-модель вызывает остальные через `pb_utils.Infere
 
 | Модель (Instruct/GGUF) | Размер Q4 | Ожидание на 780M | Почему |
 |------------------------|-----------|------------------|--------|
-| **Qwen2.5-0.5B-Instruct** | ~0.4 GB | 130+ ток/с | используется в отчёте: быстрая, без GPT-риска |
+| **Qwen2.5-0.5B-Instruct** | ~0.4 GB | ~100 (CPU) / 130+ (iGPU) ток/с | используется в отчёте: быстрая, без GPT-риска |
 | **Qwen2.5-1.5B-Instruct** | ~1.0 GB | 60–80 ток/с | заметно умнее 0.5B, влезает в VRAM iGPU |
 | **SmolLM2-1.7B-Instruct** | ~1.0 GB | 60–80 ток/с | «on-device» серия, обучалась для малых задач |
 | **Llama-3.2-1B-Instruct** | ~0.8 GB | 70–90 ток/с | хорошая база для QA |
 | Qwen2.5-7B-Instruct | ~4.5 GB | 15–25 ток/с (offload) | слишком тяжела для 780M — часть весов в RAM |
 
-Дилемма «tiny model vs качество»: SmolLM-135М fp32 на CPU давал ~23 с на ответ
-(~10 ток/с). Куда эффективнее держать **Qwen2.5-0.5B Q4_K_M на Vulkan iGPU**:
-та же «лёгкость», но плюс GPU-пропускная способность ≈ ×12 по скорости при
-сопоставимом размере памяти.
+«Tiny model vs качество»: для 7840HS достаточно **llama.cpp на любой CPU-сборке** —
+Qwen2.5-0.5B Q4_K_M выдаёт ~99–105 ток/с уже на CPU. Подключение **Vulkan iGPU**
+ускоряет генерацию ещё на ~25% (до ~123 ток/с) и даёт **×8.5 к prefill**, что
+критично при длинных промптах.
 
 ### Что ещё можно подкрутить
 
@@ -220,9 +276,10 @@ BLS-модель вызывает остальные через `pb_utils.Infere
 - Dynamic Batching уже настроен (`max_queue_delay_microseconds: 100` для
   python-моделей, `dynamic_batching {}` — по умолчанию для ONNX).
 
-**Главный вывод**: на APU достаточно перенести autoregressive-генерацию с
-CPU-`transformers` на **llama.cpp (Vulkan)** — latency падает с ~23 с до ~2 с
-(×10), очередь — с 6.2 с до 0.3 мс, а BLS-пайплайн в Triton остаётся тем же.
+**Главный вывод**: переход генерации на **llama.cpp** снимает узкое место
+авторегрессии. На чистой (без-Vulkan) CPU-сборке p50 `generation` ≈ 2.7 с;
+подключение **Vulkan iGPU** дожимает до ≈1.95 с (×1.39). Очередь — <0.3 мс в
+обоих вариантах, а BLS-пайплайн в Triton остаётся тем же.
 
 ## 7. Артефакты в репозитории
 
